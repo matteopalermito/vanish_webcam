@@ -102,6 +102,20 @@ After the first run of `START_LOCAL.bat` has created the environment:
 .\.venv-local\Scripts\python.exe -m unittest discover -p "test_*.py"
 ```
 
+## Project structure
+
+| File | Responsibility |
+|---|---|
+| `vanish_cam.py` | Entry point: command line, start menu, and the main loop (calibration, phases, keys, output). It knows nothing about specific modes. |
+| `modes.py` | One class per mode (`NormalMode`, `NarutoMode`, `GokuMode`) with a common interface: gesture trigger, effect rendering, and timing. |
+| `gestures.py` | Gesture detectors on MediaPipe landmarks (V sign, joined hands, fingers on forehead). |
+| `mediapipe_tasks.py` | Model paths, first-run download, and MediaPipe task construction; person segmentation. |
+| `video_io.py` | Webcam capture and virtual camera output. |
+| `normal_effect.py`, `naruto_effect.py`, `goku_effect.py` | Pure drawing code for each effect. |
+| `vanish_sound.py` | Non-blocking MP3 playback. |
+
+To add a mode, subclass `Mode` in `modes.py`, implement `create()`, `detect()`, and `render()`, and add the class to `MODES`. The start menu, the `--mode` option, and the main loop pick it up automatically.
+
 ## Visual assets
 
 The [wooden log](assets/substitution_log.png) is an original illustration generated with ImageGen using the supplied image as a visual reference. Smoke is drawn in real time by `naruto_effect.py` so it follows the person's position and scales with the video. We also considered a [CC0 smoke sprite sheet](https://opengameart.org/content/smoke-sprite-sheet), but the procedural animation adapts better to dynamic positioning without an additional asset. No anime frames or assets are included in the project.

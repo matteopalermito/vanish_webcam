@@ -1,10 +1,11 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 
-import vanish_cam as app
 from goku_effect import GOKU_HOLD_SECONDS, GOKU_SECONDS, forehead_salute, render_teleport
+from modes import GokuMode
+from test_video_output import run_mock_loop
 
 
 def salute_hand(spread=0.0, ring_extended=False):
@@ -52,30 +53,50 @@ class ForeheadSaluteTests(unittest.TestCase):
 
 
 class GokuHoldTests(unittest.TestCase):
-    def hold(self, state, posed, now):
+    def hold(self, mode, posed, now):
         with patch("builtins.print"):
-            return app.update_goku_hold(state, posed, now)
+            return mode.update_hold(posed, now)
 
     def test_triggers_once_after_hold_then_requires_release(self):
-        state = app.AppState(phase="ready")
-        self.assertFalse(self.hold(state, True, 0.0))
-        self.assertFalse(self.hold(state, True, GOKU_HOLD_SECONDS * 0.5))
-        self.assertTrue(self.hold(state, True, GOKU_HOLD_SECONDS + 0.01))
-        self.assertFalse(self.hold(state, True, GOKU_HOLD_SECONDS + 2.0))
-        self.assertFalse(self.hold(state, False, GOKU_HOLD_SECONDS + 3.0))
-        self.assertFalse(self.hold(state, True, 10.0))
-        self.assertTrue(self.hold(state, True, 10.0 + GOKU_HOLD_SECONDS))
+        mode = GokuMode(Mock())
+        self.assertFalse(self.hold(mode, True, 0.0))
+        self.assertFalse(self.hold(mode, True, GOKU_HOLD_SECONDS * 0.5))
+        self.assertTrue(self.hold(mode, True, GOKU_HOLD_SECONDS + 0.01))
+        self.assertFalse(self.hold(mode, True, GOKU_HOLD_SECONDS + 2.0))
+        self.assertFalse(self.hold(mode, False, GOKU_HOLD_SECONDS + 3.0))
+        self.assertFalse(self.hold(mode, True, 10.0))
+        self.assertTrue(self.hold(mode, True, 10.0 + GOKU_HOLD_SECONDS))
 
     def test_short_dropout_is_tolerated_but_long_break_restarts(self):
-        state = app.AppState(phase="ready")
-        self.hold(state, True, 0.0)
-        self.hold(state, True, 0.3)
-        self.hold(state, False, 0.45)
-        self.assertTrue(self.hold(state, True, GOKU_HOLD_SECONDS))
-        state = app.AppState(phase="ready")
-        self.hold(state, True, 0.0)
-        self.hold(state, False, 0.5)
-        self.assertFalse(self.hold(state, True, GOKU_HOLD_SECONDS))
+        mode = GokuMode(Mock())
+        self.hold(mode, True, 0.0)
+        self.hold(mode, True, 0.3)
+        self.hold(mode, False, 0.45)
+        self.assertTrue(self.hold(mode, True, GOKU_HOLD_SECONDS))
+        mode = GokuMode(Mock())
+        self.hold(mode, True, 0.0)
+        self.hold(mode, False, 0.5)
+        self.assertFalse(self.hold(mode, True, GOKU_HOLD_SECONDS))
+
+
+class GokuVideoLoopTests(unittest.TestCase):
+    def test_gesture_vanishes_and_brings_back_while_v_and_r_are_ignored(self):
+        frames = [np.full((24, 40, 3), 20 * (i + 1), np.uint8) for i in range(9)]
+        times = (0.1, 4.1, 4.3, 5.35, 6.7, 6.8, 7.0, 8.05, 9.4)
+        keys = (0, 0, 0, 0, 0, ord("r"), ord("v"), 0, ord("q"))
+        detector = Mock()
+        # Hold, fire, release while gone, hold again, fire to reappear.
+        detector.detect.side_effect = [True, True, False, True, True]
+        displayed = run_mock_loop(self, GokuMode(detector), frames, times, keys,
+                                  Mock(width=40, height=24))
+        background = frames[1]
+        np.testing.assert_array_equal(displayed[2], frames[2])
+        np.testing.assert_array_equal(displayed[4], background)
+        np.testing.assert_array_equal(displayed[5], background)
+        np.testing.assert_array_equal(displayed[6], background)  # R did not bring the person back.
+        np.testing.assert_array_equal(displayed[8], frames[8])  # Reappeared by gesture.
+        self.assertEqual(detector.detect.call_count, 5)
+        detector.close.assert_called_once()
 
 
 class TeleportRenderTests(unittest.TestCase):

@@ -3,24 +3,27 @@ from contextlib import ExitStack
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import mediapipe as mp
 import numpy as np
 
 import vanish_cam as app
+from gestures import MultiViewHandLandmarker
+from modes import NarutoMode
 from naruto_effect import (
     EFFECT_SECONDS, falling_log_anchor, joined_hands_from_landmarks,
     landed_log_anchor, load_log, overlay_log, render_substitution, substitution_anchor,
 )
-from test_video_output import arguments
+from test_video_output import run_mock_loop
 
 
 class JoinedHandsTests(unittest.TestCase):
-    def test_joined_hands_start_effect_immediately(self):
-        state = app.AppState(phase="ready")
-        self.assertFalse(app.start_naruto_on_join(state, False, 1.0))
-        self.assertTrue(app.start_naruto_on_join(state, True, 1.1))
-        self.assertEqual(state.phase, "naruto_vanishing")
-        self.assertEqual(state.vanish_started, 1.1)
-        self.assertFalse(app.start_naruto_on_join(state, True, 1.2))
+    def test_joined_hands_trigger_the_effect(self):
+        detector = Mock()
+        mode = NarutoMode(detector, log_sprite=load_log())
+        detector.recognize_joined_hands.return_value = False
+        self.assertFalse(mode.detect(None, 100, 1.0))
+        detector.recognize_joined_hands.return_value = True
+        self.assertTrue(mode.detect(None, 180, 1.1))
 
     @staticmethod
     def hand(center_x, upward=True):
@@ -49,9 +52,9 @@ class JoinedHandsTests(unittest.TestCase):
         primary, alternate = Mock(), Mock()
         primary.detect_for_video.return_value = SimpleNamespace(
             hand_landmarks=[self.hand(0.45), self.hand(0.55)])
-        recognizer = app.MultiViewHandLandmarker(primary, alternate)
-        image = app.mp.Image(image_format=app.mp.ImageFormat.SRGB,
-                             data=np.zeros((480, 640, 3), np.uint8))
+        recognizer = MultiViewHandLandmarker(primary, alternate)
+        image = mp.Image(image_format=mp.ImageFormat.SRGB,
+                         data=np.zeros((480, 640, 3), np.uint8))
         self.assertTrue(recognizer.recognize_joined_hands(image, 100))
         self.assertEqual(recognizer.last_hand_count, 2)
         alternate.detect.assert_not_called()
@@ -64,9 +67,9 @@ class JoinedHandsTests(unittest.TestCase):
             SimpleNamespace(hand_landmarks=[]),
             SimpleNamespace(hand_landmarks=[self.hand(0.45), self.hand(0.55)]),
         ]
-        recognizer = app.MultiViewHandLandmarker(primary, alternate)
-        image = app.mp.Image(image_format=app.mp.ImageFormat.SRGB,
-                             data=np.zeros((480, 640, 3), np.uint8))
+        recognizer = MultiViewHandLandmarker(primary, alternate)
+        image = mp.Image(image_format=mp.ImageFormat.SRGB,
+                         data=np.zeros((480, 640, 3), np.uint8))
         self.assertTrue(recognizer.recognize_joined_hands(image, 100))
         self.assertEqual(recognizer.preferred_view, ("full", 3))
         self.assertEqual(recognizer.last_hand_count, 2)
@@ -137,41 +140,19 @@ class MenuTests(unittest.TestCase):
 class NarutoVideoLoopTests(unittest.TestCase):
     def test_effect_is_sent_to_preview_and_virtual_camera(self):
         frames = [np.full((80, 120, 3), v, np.uint8) for v in (10, 40, 80, 120, 160)]
-        capture = Mock()
-        capture.read.side_effect = [(True, frame) for frame in frames]
-        segmenter, recognizer = Mock(), Mock()
-        recognizer.recognize_joined_hands.return_value = True
-        sound = Mock()
+        detector, sound = Mock(), Mock()
+        detector.recognize_joined_hands.return_value = True
+        mode = NarutoMode(detector, sound, load_log())
         virtual = Mock(width=120, height=80)
-        preview = []
-        with ExitStack() as mocks:
-            mocks.enter_context(patch.object(app, "parse_args", return_value=arguments(mode="naruto")))
-            mocks.enter_context(patch.object(app, "download_models"))
-            mocks.enter_context(patch.object(app, "open_camera", return_value=capture))
-            mocks.enter_context(patch.object(app, "create_tasks", return_value=(segmenter, recognizer)))
-            mocks.enter_context(patch.object(app, "VanishSound", return_value=sound))
-            mocks.enter_context(patch.object(app, "open_virtual_camera", return_value=virtual))
-            mocks.enter_context(patch.object(app, "person_mask", return_value=np.ones((80, 120), np.float32)))
-            mocks.enter_context(patch.object(app.time, "perf_counter", side_effect=(
-                0, 0, 0.1, 4.1, 4.3, 4.35, 4.40, 4.42, 5.05, 5.1, 5.9,
-            )))
-            mocks.enter_context(patch.object(app.cv2, "namedWindow"))
-            mocks.enter_context(patch.object(app.cv2, "resizeWindow"))
-            mocks.enter_context(patch.object(app.cv2, "destroyAllWindows"))
-            mocks.enter_context(patch.object(app.cv2, "imshow", side_effect=lambda name, frame: preview.append(frame.copy())))
-            mocks.enter_context(patch.object(app.cv2, "waitKey", side_effect=(0, 0, 0, 0, ord("q"))))
-            mocks.enter_context(patch.object(app.cv2, "putText", side_effect=AssertionError("Overlay vietato")))
-            mocks.enter_context(patch("builtins.print"))
-            self.assertEqual(app.run(), 0)
-        self.assertEqual(len(preview), 5)
-        for sent, shown in zip(virtual.send.call_args_list, preview):
-            np.testing.assert_array_equal(sent.args[0], shown)
+        preview = run_mock_loop(self, mode, frames, (0.1, 4.1, 4.3, 4.4, 5.9),
+                                (0, 0, 0, 0, ord("q")), virtual)
         self.assertTrue(np.any(preview[2] != frames[2]))
         self.assertTrue(np.any(preview[3] != frames[3]))
         self.assertTrue(np.any(preview[4] != frames[1]))  # Log persists.
-        recognizer.recognize_joined_hands.assert_called_once()
+        detector.recognize_joined_hands.assert_called_once()
         sound.play.assert_called_once()
         sound.close.assert_called_once()
+        detector.close.assert_called_once()
 
 
 if __name__ == "__main__":

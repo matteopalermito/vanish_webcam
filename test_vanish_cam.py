@@ -1,13 +1,14 @@
 import unittest
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import numpy as np
 import mediapipe as mp
 
-from vanish_cam import (
-    AppState, MultiViewGestureRecognizer, recognize_gesture, start_vanish_on_gesture,
-    victory_landmark_score,
-)
+import modes
+import vanish_cam as app
+from gestures import MultiViewGestureRecognizer, recognize_gesture, victory_landmark_score
+from modes import NormalMode
 
 
 def hand_points(extended=(True, True, False, False)):
@@ -127,25 +128,32 @@ class VictoryGestureTests(unittest.TestCase):
 
 
 class ImmediateAnimationTests(unittest.TestCase):
-    def test_first_recognized_v_starts_animation_immediately(self):
-        state = AppState(phase="ready")
-        self.assertTrue(start_vanish_on_gesture(state, "Victory", 0.9, 12.5))
-        self.assertEqual(state.phase, "vanishing")
-        self.assertEqual(state.vanish_started, 12.5)
+    def detect(self, status):
+        with patch.object(modes, "recognize_gesture", return_value=status):
+            return NormalMode(Mock()).detect(None, 1000, 12.5)
+
+    def test_first_recognized_v_triggers_the_effect(self):
+        self.assertTrue(self.detect(("Victory", 0.9)))
 
     def test_other_or_weak_gestures_do_not_vanish(self):
-        for name, score in (("No_Hand", 0.0), ("Hand_Detected", 0.0), ("Victory", 0.61)):
-            with self.subTest(name=name, score=score):
-                state = AppState(phase="ready")
-                self.assertFalse(start_vanish_on_gesture(state, name, score, 12.5))
-                self.assertEqual(state.phase, "ready")
-                self.assertIsNone(state.vanish_started)
+        for status in (("No_Hand", 0.0), ("Hand_Detected", 0.0), ("Victory", 0.61)):
+            with self.subTest(status=status):
+                self.assertFalse(self.detect(status))
 
-    def test_only_ready_phase_responds(self):
-        for phase in ("calibrating", "vanishing", "vanished"):
-            state = AppState(phase=phase)
-            self.assertFalse(start_vanish_on_gesture(state, "Victory", 0.9, 12.5))
-            self.assertEqual(state.phase, phase)
+    def test_only_ready_phase_listens(self):
+        mode = NormalMode(Mock())
+        self.assertTrue(app.listens_for_gesture(mode, app.Phase.READY))
+        for phase in (app.Phase.CALIBRATING, app.Phase.VANISHING, app.Phase.VANISHED):
+            self.assertFalse(app.listens_for_gesture(mode, phase))
+
+    def test_start_effect_resets_mask_and_notifies_mode(self):
+        state = app.AppState(phase=app.Phase.READY, mask=np.ones((2, 2)), mask_at=3.0)
+        mode = Mock()
+        app.start_effect(state, mode, 12.5, appearing=False)
+        self.assertIs(state.phase, app.Phase.VANISHING)
+        self.assertEqual(state.effect_started, 12.5)
+        self.assertIsNone(state.mask)
+        mode.begin.assert_called_once_with(False)
 
 
 class MultiViewTests(unittest.TestCase):
