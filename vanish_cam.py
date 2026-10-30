@@ -216,10 +216,10 @@ def download_models(mode: str = "normal") -> None:
             continue
 
         temporary = destination.with_suffix(destination.suffix + ".part")
-        print(f"[Vanish Lab] Downloading {destination.name}...")
+        print(f"[VanishCam] Downloading {destination.name}...")
         try:
             request = urllib.request.Request(
-                url, headers={"User-Agent": "Vanish-Lab/1.0"}
+                url, headers={"User-Agent": "VanishCam/1.0"}
             )
             with urllib.request.urlopen(request, timeout=60) as response:
                 total = int(response.headers.get("Content-Length", 0))
@@ -1028,7 +1028,7 @@ def main() -> int:
     except KeyboardInterrupt:
         return 0
     except Exception as error:
-        print(f"\n[Vanish Lab] ERROR: {error}", file=sys.stderr)
+        print(f"\n[VanishCam] ERROR: {error}", file=sys.stderr)
         return 1
 
 

@@ -94,6 +94,14 @@ To troubleshoot gesture recognition without adding text to the video, pass `--ge
 
 Run `BUILD_WINDOWS.bat`. It installs PyInstaller and the dependencies, downloads the models, builds `dist\VanishCam.exe` from `VanishCam.spec`, and runs a self-test.
 
+## Running the tests
+
+After the first run of `START_LOCAL.bat` has created the environment:
+
+```powershell
+.\.venv-local\Scripts\python.exe -m unittest discover -p "test_*.py"
+```
+
 ## Visual assets
 
 The [wooden log](assets/substitution_log.png) is an original illustration generated with ImageGen using the supplied image as a visual reference. Smoke is drawn in real time by `naruto_effect.py` so it follows the person's position and scales with the video. We also considered a [CC0 smoke sprite sheet](https://opengameart.org/content/smoke-sprite-sheet), but the procedural animation adapts better to dynamic positioning without an additional asset. No anime frames or assets are included in the project.
