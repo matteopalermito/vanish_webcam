@@ -166,7 +166,7 @@ class NarutoVideoLoopTests(unittest.TestCase):
             np.testing.assert_array_equal(sent.args[0], shown)
         self.assertTrue(np.any(preview[2] != frames[2]))
         self.assertTrue(np.any(preview[3] != frames[3]))
-        self.assertTrue(np.any(preview[4] != frames[1]))  # Tronco persistente.
+        self.assertTrue(np.any(preview[4] != frames[1]))  # Log persists.
         recognizer.recognize_joined_hands.assert_called_once()
         sound.play.assert_called_once()
         sound.close.assert_called_once()

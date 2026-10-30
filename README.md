@@ -16,7 +16,7 @@ The published EXE may predate the Particles and Goku modes. To use them now, run
 
 ## Getting started
 
-1. Double-click `AVVIA_LOCALE.bat`.
+1. Double-click `START_LOCAL.bat`.
 2. In the start menu, choose **Normal Vanish**, **Naruto Vanish**, **Particles**, or **Goku** with the mouse or the `1`, `2`, `3`, and `4` keys.
 3. Step out of the camera frame for 4 seconds while the background is captured. The terminal tells you when you can step back in.
 
@@ -31,20 +31,20 @@ The published EXE may predate the Particles and Goku modes. To use them now, run
 To start a mode without the menu:
 
 ```powershell
-local_app\AVVIA_LOCALE.bat --mode naruto
-local_app\AVVIA_LOCALE.bat --mode normal
-local_app\AVVIA_LOCALE.bat --mode particles
-local_app\AVVIA_LOCALE.bat --mode goku
+.\START_LOCAL.bat --mode naruto
+.\START_LOCAL.bat --mode normal
+.\START_LOCAL.bat --mode particles
+.\START_LOCAL.bat --mode goku
 ```
 
 ## Virtual camera and OBS
 
-If [OBS Studio](https://obsproject.com/) is installed, the app automatically tries to open **OBS Virtual Camera**. The terminal shows the device name. Use `AVVIA_VIRTUAL.bat` to require a virtual camera. Select **OBS Virtual Camera** in the app that will receive the video. OBS's virtual camera must be stopped while this app is producing its output.
+If [OBS Studio](https://obsproject.com/) is installed, the app automatically tries to open **OBS Virtual Camera**. The terminal shows the device name. Use `START_VIRTUAL.bat` to require a virtual camera. Select **OBS Virtual Camera** in the app that will receive the video. OBS's virtual camera must be stopped while this app is producing its output.
 
-To use the effect in an OBS scene, run `AVVIA_OBS.bat`, add a **Window Capture** source, select **Webcam - Anteprima**, and then start the virtual camera from OBS. Alternatively, use [Unity Capture](https://github.com/schellingb/UnityCapture) as a separate virtual video source:
+To use the effect in an OBS scene, run `START_OBS.bat`, add a **Window Capture** source, select **Webcam - Preview**, and then start the virtual camera from OBS. Alternatively, use [Unity Capture](https://github.com/schellingb/UnityCapture) as a separate virtual video source:
 
 ```powershell
-local_app\AVVIA_VIRTUAL.bat --virtual-backend unitycapture
+.\START_VIRTUAL.bat --virtual-backend unitycapture
 ```
 
 OBS has only one virtual camera. Do not use it as both an OBS input and output at the same time. See the [pyvirtualcam documentation](https://github.com/letmaik/pyvirtualcam#supported-virtual-cameras).
@@ -62,7 +62,7 @@ The `V` and `R` keys are disabled in Goku mode.
 You can change the camera, resolution, and maximum virtual-output FPS:
 
 ```powershell
-local_app\AVVIA_LOCALE.bat --camera 1 --width 1280 --height 720 --fps 30
+.\START_LOCAL.bat --camera 1 --width 1280 --height 720 --fps 30
 ```
 
 To troubleshoot gesture recognition without adding text to the video, pass `--gesture-debug`. Diagnostic information appears only in the terminal.
